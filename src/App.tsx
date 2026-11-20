@@ -1,121 +1,80 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useReducer, useRef } from 'react'
+import { createInitialState, gameReducer, THROWS_PER_ROUND } from './game/reducer'
+import { getTotalScore } from './game/scoring'
+import type { GameStatus, Target } from './game/types'
 import './App.css'
 
+const targets: Target[] = ['MISS', 'TEN', 'TWENTY_FIVE', 'FIFTY', 'HUNDRED']
+
+const statusLabels: Record<GameStatus, string> = {
+  MENU: 'Ready to start',
+  WAITING_FOR_THROW: 'Ready to throw',
+  PROCESSING_THROW: 'Processing throw',
+  SHOWING_RESULT: 'Throw result',
+  ROUND_COMPLETE: 'Round complete',
+}
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [game, dispatch] = useReducer(gameReducer, undefined, createInitialState)
+  const throwSequence = useRef(0)
+  const score = getTotalScore(game)
+  const throwsRemaining = THROWS_PER_ROUND - game.throws.length
+  const lastThrow = game.throws.at(-1)
+
+  function simulateThrow() {
+    const target = targets[Math.floor(Math.random() * targets.length)]
+    const id = `simulated-${++throwSequence.current}`
+
+    dispatch({ type: 'THROW_STARTED' })
+    dispatch({ type: 'THROW_RESOLVED', id, target, source: 'simulated' })
+  }
+
+  function playAgain() {
+    dispatch({ type: 'RESET' })
+    dispatch({ type: 'START' })
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <main className="game">
+      <h1>Disc-O-Ball</h1>
+      <dl className="scoreboard">
+        <div>
+          <dt>Score</dt>
+          <dd>{score}</dd>
         </div>
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
+          <dt>Throws remaining</dt>
+          <dd>{throwsRemaining}</dd>
+        </div>
+      </dl>
+
+      <div className="round-status" role="status" aria-atomic="true">
+        <p>{statusLabels[game.status]}</p>
+        {game.status === 'SHOWING_RESULT' && lastThrow && (
+          <p className="outcome">
+            Throw {lastThrow.number} · {lastThrow.target === 'MISS' ? 'Miss' : 'Hit'} · {lastThrow.score} points
           </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
+        )}
+        {game.status === 'ROUND_COMPLETE' && (
+          <p className="outcome">Final score · {score} points</p>
+        )}
+      </div>
+
+      {game.status === 'MENU' && (
+        <button type="button" onClick={() => dispatch({ type: 'START' })}>Start Game</button>
+      )}
+      {game.status === 'WAITING_FOR_THROW' && (
+        <button type="button" onClick={simulateThrow}>Simulate Throw</button>
+      )}
+      {game.status === 'SHOWING_RESULT' && (
+        <button type="button" onClick={() => dispatch({ type: 'CONTINUE' })}>
+          {throwsRemaining === 0 ? 'Show Final Score' : 'Continue'}
         </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      )}
+      {game.status === 'ROUND_COMPLETE' && (
+        <button type="button" onClick={playAgain}>Play Again</button>
+      )}
+    </main>
   )
 }
 
